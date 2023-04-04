@@ -1,9 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
 namespace web_services_l1.Controllers;
 [ApiController]
 [Route("[controller]")]
 public class MoviesController : ControllerBase
-{
+{   
+    private MoviesContext dbContext;
+
+    public MoviesController() {
+        dbContext = new MoviesContext();
+    }
+
     [HttpPost("UploadMovieCsv")]
     public string UploadMovieCsv(IFormFile inputFile)
     {/*
@@ -91,7 +99,7 @@ public class MoviesController : ControllerBase
         string fileContent = System.Text.Encoding.Default.GetString(buffer);
         strm.Close();
 
-        MoviesContext dbContext = new MoviesContext();
+        // MoviesContext dbContext = new MoviesContext();
         var usersList = new List<User>();
         var ratingList = new List<Rating>();
         int ratingID;
@@ -179,26 +187,77 @@ public class MoviesController : ControllerBase
     [HttpGet("GetAllGenres")]
     public IEnumerable<Genre> GetAllGenres()
     {
-        MoviesContext dbContext = new MoviesContext();
         return dbContext.Genres.AsEnumerable();
     }
 
     [HttpGet("GetMoviesByName/{search_phrase}")]
     public IEnumerable<Movie> GetMoviesByName(string search_phrase)
     {
-        MoviesContext dbContext = new MoviesContext();
+        // MoviesContext dbContext = new MoviesContext();
         return dbContext.Movies.Where(e => e.Title.Contains(search_phrase));
     }
 
     [HttpPost("GetMoviesByGenre")]
     public IEnumerable<Movie> GetMoviesByGenre(string search_phrase)
     {
-        MoviesContext dbContext = new MoviesContext();
+        // MoviesContext dbContext = new MoviesContext();
         return dbContext.Movies.Where(
         m => m.Genres.Any( p => p.Name.Contains(search_phrase))
         );
     }
 
+    [HttpGet("GetMovie/{id}")]
+    public Movie getMovieById(int id) {
+        var movie = dbContext.Movies.Include(m => m.Genres).Where(m => m.MovieID == id).First();               
+        return movie;
+    }
+
+// zad 1
+
+    [HttpGet("GetMovieGenresByMovieId/{movie_id}")]
+     public IEnumerable<Genre> GetAllGenres(int movie_id) {
+        return dbContext.Genres.Where(g => g.Movies.Any(m => m.MovieID == movie_id));
+     }
+
+
+// zad 2
+
+    [HttpGet("GetVectorOfMovieGenres/{id}")]
+    public List<int> GetVectorOfMovieGenres(int id) {
+        List<int> numVector = new List<int>();
+        List<Genre> allGenres = GetAllGenres().OrderBy(g => g.GenreID).ToList();
+        Movie movie = getMovieById(id);
+        if (movie != null) {
+            foreach(Genre genre in allGenres){
+                if (movie.Genres.Any(g => g.GenreID == genre.GenreID)) numVector.Add(1);   
+                else numVector.Add(0);   
+            }
+        }
+        return numVector;
+    }
+
+    // zad 3
+
+    double cosineSimilarity(List<int> l1, List<int> l2) {
+        double num = 0;
+        double dem = 0;
+        double dem1 = 0;
+        double dem2 = 0;
+        for (int i = 0; i < l1.Count; i++) {
+            num += l1[i]*l2[i];
+            dem1+= l1[i]*l1[i];
+            dem2+= l2[i]*l2[i];
+        }
+        dem = Math.Sqrt(dem1) * Math.Sqrt(dem2);
+        return num/dem;
+    }
+
+    [HttpGet("GetCosineSim/{id1}/{id2}")]
+    public double GetCosineSim(int id1, int id2) {
+        List<int> v1 = GetVectorOfMovieGenres(id1);
+        List<int> v2 = GetVectorOfMovieGenres(id2);
+        return cosineSimilarity(v1, v2);
+    }
 
 
 }

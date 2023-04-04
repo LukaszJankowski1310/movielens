@@ -14,14 +14,13 @@ public class MoviesController : ControllerBase
 
     [HttpPost("UploadMovieCsv")]
     public string UploadMovieCsv(IFormFile inputFile)
-    {/*
+    {
         var strm = inputFile.OpenReadStream();
         byte[] buffer = new byte[inputFile.Length];
         strm.Read(buffer,0,(int)inputFile.Length);
         string fileContent = System.Text.Encoding.Default.GetString(buffer);
         strm.Close();
 
-        MoviesContext dbContext = new MoviesContext();
         List<Genre> genreList = new List<Genre>();
         List<Movie> movieList = new List<Movie>();
 
@@ -39,55 +38,36 @@ public class MoviesController : ControllerBase
             int movieID;
             string title = tokens[1];
             string[] genres = tokens[2].Split("|");
-
+            List<Genre> movieGenres = new List<Genre>();
             try {
                 movieID = int.Parse(tokens[0]);
             }catch (FormatException e) {
                 Console.WriteLine("Parsing error: " + e);
                 continue;
             }
-            // List<Genre> movieGenre = 
-            Movie movie = new Movie {
-                MovieID = movieID,
-                Title = title,
-                Genres = new List<Genre>()
-            }; 
-           
-            // do naprawy
-
-            foreach(string genre in genres) {
-                movie.Genres.Add(
-                    new Genre {
-                        
-                    }
-                );
-            }
-
-
-
-            foreach(string genre in Genres)
-            {
-                Genre g = new Genre();
-                g.Name = genre;
-                if(!dbContext.Genres.Any(e => e.Name == g.Name))
-                {
-                dbContext.Genres.Add(g);
-                dbContext.SaveChanges();
+            foreach(string genre_name in genres) {
+                Genre genre = new Genre {Name = genre_name};
+                if(!genreList.Any(g => g.Name == genre.Name) && !dbContext.Genres.Any(g => g.Name == genre.Name)){ 
+                    genreList.Add(genre);
+                    dbContext.Add(genre);
+                    dbContext.SaveChanges();
                 }
-                IQueryable<Genre> results = dbContext.Genres.Where(e => e.Name == g.Name);
-                if(results.Count() > 0)
-                movieGenres.Add(results.First());
+                IQueryable<Genre> results = dbContext.Genres.Where(g => g.Name == genre.Name);
+                if (results.Count() > 0) {
+                    movieGenres.Add(genre);
+                }
             }
-            Movie m = new Movie();
-            m.MovieID = int.Parse(MovieID);
-            m.Title = MovieName;
-            m.Genres = movieGenres;
-            if(!dbContext.Movies.Any(e=>e.MovieID == m.MovieID)) dbContext.Movies.Add(m);
-            dbContext.SaveChanges();
+            Movie movie = new Movie {Title = title, Genres = movieGenres, MovieID = movieID};
+
+            if (!movieList.Any(m => m.MovieID == movie.MovieID) && !dbContext.Movies.Any(m => movieID == movie.MovieID)) {
+                movieList.Add(movie);
             }
-            dbContext.SaveChanges();
-        */
-            return "OK";
+        }
+
+        dbContext.AddRange(movieList);
+        dbContext.SaveChanges();
+
+        return "OK";
     }
 
  
@@ -200,7 +180,6 @@ public class MoviesController : ControllerBase
     [HttpPost("GetMoviesByGenre")]
     public IEnumerable<Movie> GetMoviesByGenre(string search_phrase)
     {
-        // MoviesContext dbContext = new MoviesContext();
         return dbContext.Movies.Where(
         m => m.Genres.Any( p => p.Name.Contains(search_phrase))
         );
@@ -259,5 +238,13 @@ public class MoviesController : ControllerBase
         return cosineSimilarity(v1, v2);
     }
 
+    // [HttpGet("GetSimilarMoviesToMovie/{id}")]
+    // public IEnumerable<Movie> GetSimilarMoviesToMovie(int id) {
+    //     IEnumerable<Movie> list = new List<Movie>();
+    //     Movie movie = getMovieById(id);
+    //     ICollection<Genre> l = movie.Genres;
+    //     return dbContext.Movies.Where(m => m.Genres.Any(g => l.Contains(g)));
+    // }
+    
 
 }

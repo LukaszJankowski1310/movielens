@@ -6,15 +6,16 @@ namespace web_services_l1.Controllers;
 [Route("[controller]")]
 public class MoviesController : ControllerBase
 {   
-    private MoviesContext dbContext;
+    // private MoviesContext dbContext;
 
-    public MoviesController() {
-        dbContext = new MoviesContext();
-    }
+    // public MoviesController() {
+    //     // dbContext = new MoviesContext();
+    // }
 
     [HttpPost("UploadMovieCsv")]
     public string UploadMovieCsv(IFormFile inputFile)
     {
+         MoviesContext dbContext = new MoviesContext();
         var strm = inputFile.OpenReadStream();
         byte[] buffer = new byte[inputFile.Length];
         strm.Read(buffer,0,(int)inputFile.Length);
@@ -75,6 +76,7 @@ public class MoviesController : ControllerBase
  
     [HttpPost("UploadUsersRatingCsv")]
     public string UploadUsersRatingCsv(IFormFile inputFile) {
+         MoviesContext dbContext = new MoviesContext();
         var strm = inputFile.OpenReadStream();
         byte[] buffer = new byte[inputFile.Length];
         strm.Read(buffer,0,(int)inputFile.Length);
@@ -169,19 +171,21 @@ public class MoviesController : ControllerBase
     [HttpGet("GetAllGenres")]
     public IEnumerable<Genre> GetAllGenres()
     {
+         MoviesContext dbContext = new MoviesContext();
         return dbContext.Genres.AsEnumerable();
     }
 
     [HttpGet("GetMoviesByName/{search_phrase}")]
     public IEnumerable<Movie> GetMoviesByName(string search_phrase)
     {
-        // MoviesContext dbContext = new MoviesContext();
+        MoviesContext dbContext = new MoviesContext();
         return dbContext.Movies.Where(e => e.Title.Contains(search_phrase));
     }
 
     [HttpPost("GetMoviesByGenre")]
     public IEnumerable<Movie> GetMoviesByGenre(string search_phrase)
     {
+         MoviesContext dbContext = new MoviesContext();
         return dbContext.Movies.Where(
         m => m.Genres.Any( p => p.Name.Contains(search_phrase))
         );
@@ -189,6 +193,7 @@ public class MoviesController : ControllerBase
 
     [HttpGet("GetMovie/{id}")]
     public Movie getMovieById(int id) {
+         MoviesContext dbContext = new MoviesContext();
         var movie = dbContext.Movies.Include(m => m.Genres).Where(m => m.MovieID == id).First();               
         return movie;
     }
@@ -197,12 +202,15 @@ public class MoviesController : ControllerBase
 
     [HttpGet("GetMovieGenresByMovieId/{movie_id}")]
      public IEnumerable<Genre> GetAllGenres(int movie_id) {
+         MoviesContext dbContext = new MoviesContext();
+
         return dbContext.Genres.Where(g => g.Movies.Any(m => m.MovieID == movie_id));
      }
 
 
      [HttpGet("GetAllMovies")]
       public IEnumerable<Movie> GetAllMovies() {
+        MoviesContext dbContext = new MoviesContext();
         return dbContext.Movies.Include(m => m.Genres);
      }
 
@@ -221,6 +229,7 @@ public class MoviesController : ControllerBase
                 else numVector.Add(0);   
             }
         }
+  
         return numVector;
     }
 
@@ -251,6 +260,7 @@ public class MoviesController : ControllerBase
 
     [HttpGet("GetSimilarMoviesToMovie/{id}")]
     public IEnumerable<Movie> GetSimilarMoviesToMovie(int id) {
+        MoviesContext dbContext = new MoviesContext();
         List<Movie> simMovies = new List<Movie>();
         Movie movie = dbContext.Movies.Include(m => m.Genres)
                                 .Where(m=> m.MovieID ==  id)
@@ -277,10 +287,12 @@ public class MoviesController : ControllerBase
     
      [HttpGet("GetSimilarMoviesWithThreshold/{id}/{threshold}")]
      public IEnumerable<Movie> GetSimilarMoviesWithThreshold(int id, double threshold) {
+        MoviesContext dbContext = new MoviesContext();
+
         List<Movie> finalMovies  = new List<Movie>();
         Movie movie = getMovieById(id);
         List<int> movieGenresVector = GetVectorOfMovieGenres(id);
-        var allMovies = GetAllMovies();
+        var allMovies = dbContext.Movies;
         foreach(var m in allMovies) {
             if (m.MovieID == id) continue;
             List<int> mGenreVector = GetVectorOfMovieGenres(m.MovieID);
@@ -292,5 +304,41 @@ public class MoviesController : ControllerBase
 
         return finalMovies;
      }
+
+    [HttpGet("GetMoviesRatedByUser/{userId}")]
+    public IEnumerable<Movie> GetMoviesRatedByUser(int userId){
+        MoviesContext dbContext = new MoviesContext();
+       var rat =  dbContext.Ratings
+        .Include(r => r.RatingUser)
+        .Include(r => r.RatedMovie)
+        .Where(r => r.RatingUser.UserID == userId);
+        return dbContext.Movies.Where(m => rat.Any(r=> r.RatedMovie.MovieID == m.MovieID));
+    }
+    [HttpGet("GetOrderedByValueMoviesRatedByUser/{userId}")]
+    public IEnumerable<Rating> GetOrderedByValueMoviesRatedByUser(int userId) {
+        MoviesContext dbContext = new MoviesContext();
+         var rat =  dbContext.Ratings
+        .Include(r => r.RatingUser)
+        .Include(r => r.RatedMovie)
+        .Where(r => r.RatingUser.UserID == userId).OrderByDescending(r => r.RatingValue);
+        return rat;
+
+    }
+    [HttpGet("GetHighestRatedMovieByUser/{userId}")]
+    public Movie GetHighestRatedMovieByUser(int userId) {
+        return GetOrderedByValueMoviesRatedByUser(userId).First().RatedMovie;
+    }
+
+    [HttpGet("GetSimilarMoviesToHighesRatedMovieByUser/{userId}")]
+    public IEnumerable<Movie> GetSimilarMoviesToHighesRatedMovieByUser(int userId) {
+        Movie highestRatedMovie = GetHighestRatedMovieByUser(userId);
+        return GetSimilarMoviesWithThreshold(highestRatedMovie.MovieID, 0.5);
+
+    }
+    
+    [HttpGet("GetSetOfSimilarMovies/{userId}")]
+    public IEnumerable<Movie> GetSetOfSimilarMovies(int userId) {
+       return GetSimilarMoviesToHighesRatedMovieByUser(userId).Take(10);
+    }
 
 }

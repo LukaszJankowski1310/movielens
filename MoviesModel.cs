@@ -1,14 +1,20 @@
 using Microsoft.EntityFrameworkCore;
 using MySql.EntityFrameworkCore.Extensions;
+using System.Text.Json.Serialization;
+using System.Runtime.Serialization;
 namespace web_services_l1;
 public class Movie {
     public int MovieID {get; set;}
     public string? Title {get;set;}
+
+
     public virtual ICollection<Genre> Genres{get; set;}
 }
 public class Genre {
     public int GenreID {get; set;}
     public string? Name {get; set;}
+    [JsonIgnore]
+    [IgnoreDataMember]
     public virtual ICollection<Movie> Movies {get; set;}
 }
 
